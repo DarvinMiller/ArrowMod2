@@ -1,0 +1,46 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Ищем папку, где лежит gradlew (корень репозитория или подпапка)
+      - name: Find project directory
+        id: proj
+        run: |
+          G=$(find . -name gradlew -not -path './.git/*' | head -n 1)
+          if [ -z "$G" ]; then
+            echo "gradlew не найден в репозитории. Содержимое:"
+            find . -not -path './.git/*' | head -n 60
+            exit 1
+          fi
+          D=$(dirname "$G")
+          echo "Проект: $D"
+          echo "dir=$D" >> "$GITHUB_OUTPUT"
+
+      - name: Make gradlew executable
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: chmod +x gradlew
+
+      - name: Build
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: ./gradlew build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArrowMod2
+          path: |
+            ${{ steps.proj.outputs.dir }}/build/libs/*.jar
+            !${{ steps.proj.outputs.dir }}/build/libs/*-sources.jar
